@@ -26,15 +26,21 @@ var Game = {
         //  I think that Arcade Physics are enabled by default but i'm not sure about it. ¯\_(ツ)_/¯
         this.game.physics.startSystem(Phaser.Physics.ARCADE);
 
+        this.SHOT_DELAY = 100; // milliseconds (10 bullets/second)
+        this.BULLET_SPEED = 500; // pixels/second
+        this.NUMBER_OF_BULLETS = 20;
+
         // Creating objects
         this._createLevel();
         this._createPrisoners();
         this._createEnemies();
+        this._createBullets();
         this._createHelicopter();
 
         // Enable key controls
         cursors = this.game.input.keyboard.createCursorKeys();
 
+        // Creating a text object to show rescued value
         rescuedText = this.game.add.text(16, 16, 'Rescued: 0', { fontSize: '32px', fill: '#000' });
         rescuedText.fixedToCamera = true;
     },
@@ -42,8 +48,11 @@ var Game = {
     update: function() {
         this.game.physics.arcade.collide(helicopter, platform);
 
-        //  Checks if the helicopter overlaps with any of the prisoners, if he does call the rescuePrisoner function
+        // Checks if the helicopter overlaps with any of the prisoners, if he does call the rescuePrisoner function
         this.game.physics.arcade.overlap(helicopter, prisoners, this._rescuePrisoner, null, this);
+
+        // Kill enemies
+        this.game.physics.arcade.overlap(this.bulletPool, enemies, this._killEnemies, null, this);
 
         this._handleCursors();
     },
@@ -85,6 +94,28 @@ var Game = {
         e1 = enemies.create(880, this.game.world.height - 160, 'enemy');
         e2 = enemies.create(960, this.game.world.height - 160, 'enemy');
         e3 = enemies.create(1040, this.game.world.height - 160, 'enemy');
+
+        this.game.physics.arcade.enable(enemies);
+    },
+
+    _createBullets: function() {
+        // Create an object pool of bullets
+        this.bulletPool = this.game.add.group();
+
+        for(var i = 0; i < this.NUMBER_OF_BULLETS; i++) {
+            // Create each bullet and add it to the group.
+            var bullet = this.game.add.sprite(0, 0, 'bullet');
+            this.bulletPool.add(bullet);
+
+            // Set its pivot point to the center of the bullet
+            bullet.anchor.setTo(0.5, 0.5);
+
+            // Enable physics on the bullet
+            this.game.physics.enable(bullet, Phaser.Physics.ARCADE);
+
+            // Set its initial state to "dead".
+            bullet.kill();
+        }
     },
 
     _createHelicopter: function() {
@@ -94,10 +125,10 @@ var Game = {
         // set camera to follow him
         this.game.camera.follow(helicopter);
 
-        //  We need to enable physics to helicopter and the platform
+        // We need to enable physics to helicopter and the platform
         this.game.physics.arcade.enable(helicopter);
 
-        //  Helicopter colliding on world bounds
+        // Helicopter colliding on world bounds
         helicopter.body.collideWorldBounds = true;
     },
 
@@ -107,6 +138,45 @@ var Game = {
         prisoner.kill();
         rescued += 1;
         rescuedText.text = 'Rescued: ' + rescued;
+    },
+
+    _killEnemies: function(bullet, enemy) {
+        enemy.kill();
+        bullet.kill();
+    },
+
+    _shootBullet: function() {
+        // Enforce a short delay between shots by recording
+        // the time that each bullet is shot and testing if
+        // the amount of time since the last shot is more than
+        // the required delay.
+        if (this.lastBulletShotAt === undefined) this.lastBulletShotAt = 0;
+        if (this.game.time.now - this.lastBulletShotAt < this.SHOT_DELAY) return;
+        this.lastBulletShotAt = this.game.time.now;
+
+        // Get a dead bullet from the pool
+        var bullet = this.bulletPool.getFirstDead();
+
+        // If there aren't any bullets available then don't shoot
+        if (bullet === null || bullet === undefined) return;
+
+        // Revive the bullet
+        // This makes the bullet "alive"
+        bullet.revive();
+
+        // Bullets should kill themselves when they leave the world.
+        // Phaser takes care of this for me by setting this flag
+        // but you can do it yourself by killing the bullet if
+        // its x,y coordinates are outside of the world.
+        bullet.checkWorldBounds = true;
+        bullet.outOfBoundsKill = true;
+
+        // Set the bullet position to the gun position.
+        bullet.reset(helicopter.x + 50, helicopter.y + 50);
+
+        // Shoot it
+        bullet.body.velocity.x = this.BULLET_SPEED;
+        bullet.body.velocity.y = 0;
     },
 
     _handleCursors: function() {
@@ -127,6 +197,10 @@ var Game = {
             helicopter.body.velocity.y = -200;
         } else if (cursors.down.isDown) {
             helicopter.body.velocity.y = 200;
+        }
+
+        if (this.game.input.keyboard.isDown(Phaser.Keyboard.SPACEBAR)) {
+            this._shootBullet();
         }
     },
 };
