@@ -1,6 +1,7 @@
 var platform,
     helicopter,
     cursors,
+    base,
     rescued = 0,
     saved = 0,
     rescuedText,
@@ -47,6 +48,7 @@ var Game = {
 
     update: function() {
         this.game.physics.arcade.collide(helicopter, platform);
+        this.game.physics.arcade.collide(helicopter, base);
 
         // Checks if the helicopter overlaps with any of the prisoners, if he does call the rescuePrisoner function
         this.game.physics.arcade.overlap(helicopter, prisoners, this._rescuePrisoner, null, this);
@@ -55,6 +57,15 @@ var Game = {
         this.game.physics.arcade.overlap(this.bulletPool, enemies, this._killEnemies, null, this);
 
         this._handleCursors();
+
+        this._checkFinish();
+
+    },
+
+    _checkFinish: function() {
+        if (helicopter.body.touching.down & helicopter.body.position.y >= 100 & rescued == 3) {
+            window.location.reload();
+        }
     },
 
     _createLevel: function() {
@@ -65,13 +76,21 @@ var Game = {
         this.game.add.sprite(0, 100, 'cloud');
         this.game.add.sprite(1000, 150, 'cloud');
 
+        // adding a base to return
+        base = this.game.add.sprite(0, 200, 'platform');
+        base.scale.setTo(0.4, 1);
+
+        // enabling physics and settings base body to fixed
+        this.game.physics.arcade.enable(base);
+        base.body.enable = true;
+        base.body.immovable = true;
+
         // adding platform and scale to look better
         platform = this.game.add.sprite(0, this.game.world.height - 64, 'platform');
         platform.scale.setTo(4, 2);
 
         // enabling phisics and setting body to fixed
         this.game.physics.arcade.enable(platform);
-
         platform.body.enable = true;
         platform.body.immovable = true;
     },
